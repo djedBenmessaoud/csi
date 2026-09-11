@@ -1,0 +1,39 @@
+name: Fireworks API key test
+
+on:
+  push:
+    branches:
+      - claude/fireworks-api-key-test-8kmin4
+    paths:
+      - 'fireworks-api-test/**'
+      - '.github/workflows/fireworks-api-test.yml'
+  workflow_dispatch:
+
+jobs:
+  test-key:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Check secret is configured
+        env:
+          FIREWORKS_API_KEY: ${{ secrets.FIREWORKS_API_KEY }}
+        run: |
+          if [ -z "$FIREWORKS_API_KEY" ]; then
+            echo "::error::Repository secret FIREWORKS_API_KEY is not set."
+            echo "Add it at: Settings > Secrets and variables > Actions > New repository secret"
+            exit 1
+          fi
+          echo "Secret is present."
+
+      - name: Run Fireworks API key tests
+        env:
+          FIREWORKS_API_KEY: ${{ secrets.FIREWORKS_API_KEY }}
+        run: python3 fireworks-api-test/test_fireworks_key.py
