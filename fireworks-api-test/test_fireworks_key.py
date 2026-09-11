@@ -29,16 +29,15 @@ import concurrent.futures
 import requests
 
 BASE_URL = "https://api.fireworks.ai/inference/v1"
-TIMEOUT = 60
+TIMEOUT = 180
 
 # Tried in order when the account's model listing gives us nothing usable.
-# Non-reasoning V3 variants first: they answer directly, so the tests stay cheap.
 FALLBACK_MODELS = [
+    "accounts/fireworks/models/deepseek-v4p1-flash",
+    "accounts/fireworks/models/deepseek-v4-flash-0731",
+    "accounts/fireworks/models/deepseek-v4-pro",
     "accounts/fireworks/models/deepseek-v3p1",
-    "accounts/fireworks/models/deepseek-v3-0324",
     "accounts/fireworks/models/deepseek-v3",
-    "accounts/fireworks/models/deepseek-r1-0528",
-    "accounts/fireworks/models/deepseek-r1",
 ]
 
 
@@ -57,8 +56,9 @@ def headers(api_key: str) -> dict:
 
 
 def _rank(model_id: str) -> tuple:
-    """Prefer non-reasoning V3 variants over R1 so replies are short and direct."""
-    return (0 if "-v3" in model_id else 1, model_id)
+    """Prefer fast general-purpose chat variants; push vision/experimental builds last."""
+    special = "vision" in model_id or "exp" in model_id
+    return (1 if special else 0, 0 if "flash" in model_id else 1, model_id)
 
 
 def check_key_valid(api_key: str) -> tuple:
@@ -149,8 +149,10 @@ def _consume_stream(resp) -> tuple:
         if data.strip() == "[DONE]":
             break
         obj = json.loads(data)
-        delta = obj.get("choices", [{}])[0].get("delta", {})
-        piece = _extract(delta)
+        choices = obj.get("choices") or []
+        if not choices:
+            continue
+        piece = _extract(choices[0].get("delta") or {})
         if piece:
             text += piece
             chunks += 1
@@ -162,7 +164,7 @@ def test_simple_request(api_key: str, model: str) -> bool:
     payload = {
         "model": model,
         "messages": [{"role": "user", "content": "Reply with exactly one word: pong"}],
-        "max_tokens": 64,
+        "max_tokens": 256,
         "temperature": 0,
         "stream": False,
     }
@@ -191,7 +193,7 @@ def test_streaming_request(api_key: str, model: str) -> bool:
     payload = {
         "model": model,
         "messages": [{"role": "user", "content": "Count from 1 to 5, separated by spaces."}],
-        "max_tokens": 96,
+        "max_tokens": 256,
         "temperature": 0,
         "stream": True,
     }
@@ -230,7 +232,7 @@ def test_multiple_non_streaming(api_key: str, model: str, n: int = 3) -> bool:
         payload = {
             "model": model,
             "messages": [{"role": "user", "content": f"Reply with exactly the number {i + 1} and nothing else."}],
-            "max_tokens": 64,
+            "max_tokens": 256,
             "temperature": 0,
             "stream": False,
         }
@@ -259,7 +261,7 @@ def _stream_one(api_key: str, model: str, index: int, n: int) -> bool:
     payload = {
         "model": model,
         "messages": [{"role": "user", "content": f"Say the word 'request-{index + 1}' three times."}],
-        "max_tokens": 96,
+        "max_tokens": 256,
         "temperature": 0,
         "stream": True,
     }
