@@ -1,6 +1,7 @@
 # Fireworks AI API key test
 
-Checks whether a Fireworks AI API key works, across four use cases:
+Checks whether a Fireworks AI API key works against DeepSeek, across four
+use cases:
 
 1. Simple request — single chat completion, non-streaming
 2. Streaming request — single chat completion, streaming
@@ -8,7 +9,10 @@ Checks whether a Fireworks AI API key works, across four use cases:
 4. Multiple requests — several concurrent chat completions, streaming
 
 A cheap `GET /models` call runs first to confirm the key authenticates at
-all before spending tokens on the rest.
+all before spending tokens on the rest. The script then probes DeepSeek
+model IDs and uses the first one the account can actually reach, so a
+deprecated or undeployed model ID doesn't get mistaken for a bad key.
+Set `FIREWORKS_MODEL` to pin a specific model instead.
 
 ## Usage
 
